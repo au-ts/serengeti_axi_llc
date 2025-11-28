@@ -5,6 +5,7 @@
 // Authors:
 // - Nicole Narr <narrn@ethz.ch>
 // - Christopher Reinwardt <creinwar@ethz.ch>
+// - Hong Pang <hongpang@ethz.ch>
 // Date:   17.11.2022
 
 `include "axi_llc/typedef.svh"
@@ -153,16 +154,25 @@ module axi_llc_reg_wrap #(
   ///
   /// Note on restrictions:
   /// The same restriction as of parameter `NumLines` applies.
-  parameter int unsigned NumBlocks = 32'd0,
+  parameter int unsigned NumBlocks             = 32'd0,
+  /// Enabling cache partitioning
+  parameter logic        CachePartition        = 0,
+  /// Index remapping hash function used in cache partitioning
+  parameter axi_llc_pkg::algorithm_e RemapHash = axi_llc_pkg::Modulo,
+  /// Max. number of partitions supported for partitioning
+  parameter int unsigned MaxPartition          = 32'd0,
   /// AXI4+ATOP ID field width of the slave port.
   /// The ID field width of the master port is this parameter + 1.
-  parameter int unsigned AxiIdWidth = 32'd0,
+  parameter int unsigned AxiIdWidth            = 32'd0,
   /// AXI4+ATOP address field width of both the slave and master port.
-  parameter int unsigned AxiAddrWidth = 32'd0,
+  parameter int unsigned AxiAddrWidth          = 32'd0,
   /// AXI4+ATOP data field width of both the slave and the master port.
-  parameter int unsigned AxiDataWidth = 32'd0,
+  parameter int unsigned AxiDataWidth          = 32'd0,
   /// AXI4+ATOP user field width of both the slave and the master port.
-  parameter int unsigned AxiUserWidth = 32'd0,
+  parameter int unsigned AxiUserWidth          = 32'd0,
+  /// User signal offset
+  parameter int unsigned AxiUserIdMsb          = 7,
+  parameter int unsigned AxiUserIdLsb          = 0,
   /// AXI4+ATOP request type on the slave port.
   /// Expected format can be defined using `AXI_TYPEDEF_REQ_T.
   parameter type slv_req_t      = logic,
@@ -178,7 +188,7 @@ module axi_llc_reg_wrap #(
   /// Configuration RegBus interface request type
   parameter type reg_req_t      = logic,
   /// Configuration RegBus interface response type
-  parameter type reg_resp_t      = logic,
+  parameter type reg_resp_t     = logic,
   /// Full AXI4+ATOP Port address decoding rule
   parameter type rule_full_t    = axi_pkg::xbar_rule_64_t,
   /// Whether to print SRAM configs
@@ -189,7 +199,8 @@ module axi_llc_reg_wrap #(
   parameter type axi_addr_t     = logic[AxiAddrWidth-1:0],
   /// Dependent parameter, do **not** overwrite!
   /// Data type of set associativity wide registers
-  parameter type way_ind_t      = logic[SetAssociativity-1:0]
+  parameter type way_ind_t      = logic[SetAssociativity-1:0],
+  parameter type impl_in_t      = logic
 ) (
   /// Rising-edge clock of all ports.
   input logic clk_i,
@@ -197,6 +208,7 @@ module axi_llc_reg_wrap #(
   input logic rst_ni,
   /// Test mode activate, active high.
   input logic test_i,
+  input impl_in_t [2*SetAssociativity-1:0] sram_impl_i,
   /// AXI4+ATOP slave port request, CPU side
   input slv_req_t slv_req_i,
   /// AXI4+ATOP slave port response, CPU side
@@ -225,8 +237,11 @@ module axi_llc_reg_wrap #(
   output axi_llc_pkg::events_t axi_llc_events_o
 );
 
+  localparam int unsigned RegWidth = 64;
+  typedef logic [RegWidth-1:0] reg_length_t;
+
   // Define 64-bit register types for the AXI_LLC toplevel
-  `AXI_LLC_TYPEDEF_ALL(axi_llc, logic [63:0], way_ind_t)
+  `AXI_LLC_TYPEDEF_ALL(axi_llc, reg_length_t, way_ind_t)
 
   // Generated register file interface variables
   axi_llc_reg_pkg::axi_llc_reg2hw_t config_reg2hw;
@@ -263,10 +278,15 @@ module axi_llc_reg_wrap #(
     .SetAssociativity ( SetAssociativity      ),
     .NumLines         ( NumLines              ),
     .NumBlocks        ( NumBlocks             ),
+    .CachePartition   ( CachePartition        ),
+    .MaxPartition     ( MaxPartition          ),
+    .RemapHash        ( RemapHash             ),
     .AxiIdWidth       ( AxiIdWidth            ),
     .AxiAddrWidth     ( AxiAddrWidth          ),
     .AxiDataWidth     ( AxiDataWidth          ),
     .AxiUserWidth     ( AxiUserWidth          ),
+    .AxiUserIdMsb     ( AxiUserIdMsb          ),
+    .AxiUserIdLsb     ( AxiUserIdLsb          ),
     .RegWidth         ( 32'd64                ),
     .conf_regs_d_t    ( axi_llc_cfg_regs_d_t  ),
     .conf_regs_q_t    ( axi_llc_cfg_regs_q_t  ),
@@ -275,11 +295,13 @@ module axi_llc_reg_wrap #(
     .mst_req_t        ( mst_req_t             ),
     .mst_resp_t       ( mst_resp_t            ),
     .rule_full_t      ( rule_full_t           ),
-    .PrintSramCfg     ( PrintSramCfg          )
+    .PrintSramCfg     ( PrintSramCfg          ),
+    .impl_in_t        ( impl_in_t             )
   ) i_axi_llc_top_raw (
     .clk_i,
     .rst_ni,
     .test_i,
+    .sram_impl_i,
     .slv_req_i,
     .slv_resp_o,
     .mst_req_o,

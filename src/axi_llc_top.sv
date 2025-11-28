@@ -3,6 +3,8 @@
 // SPDX-License-Identifier: SHL-0.51
 //
 // Author: Wolfgang Roenninger <wroennin@iis.ee.ethz.ch>
+// - Hong Pang <hongpang@ethz.ch>
+// - Diyou Shen <dishen@ethz.ch>
 // Date:   30.04.2019
 
 /// Contains the top_level of the axi_llc with structs as AXI connections.
@@ -94,25 +96,30 @@
 /// Part of the descriptor uses directly types defined in `axi_pkg`.
 /// The other fields get defined when instantiating the design.
 ///
-/// | Name        | Type               | Function |
-/// |:----------- |:------------------ |:----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-/// | `a_x_id`    | `axi_slv_id_t`     | The AXI4+ATOP ID of the burst entering through the slave port of the design. It has the same width as the slave port AXI ID.                                                                                                                                                                                |
-/// | `a_x_addr`  | `axi_addr_t`       | The address of the descriptor. Aligned to the corresponding cache block.                                                                                                                                                                                                                                    |
-/// | `a_x_len`   | `axi_pkg::len_t`   | AXI4+ATOP burst length field. Corresponds to the number of beats which map onto the cache line accessed by this descriptor. Gets set in the splitting unit which does the mapping onto the cache line.                                                                                                      |
-/// | `a_x_size`  | `axi_pkg::size_t`  | AXI4+ATOP size field. This is important for the write and read unit to find the exact block and byte offset. Used for calculating the block location in the data storage.                                                                                                                                   |
-/// | `a_x_burst` | `axi_pkg::burst_t` | AXI4+ATOP burst type. This is important for the splitter unit as well as the read and write unit. It determines the descriptor field `a_x_addr`.                                                                                                                                                            |
-/// | `a_x_lock`  | `logic`            | AXI4+ATOP lock signal. Passed further in the miss pipeline when the line gets evicted or refilled.                                                                                                                                                                                                          |
-/// | `a_x_cache` | `axi_pkg::cache_t` | AXI4+ATOP cache signal. The cache only supports write back mode.                                                                                                                                                                                                                                            |
-/// | `a_x_prot`  | `axi_pkg::prot_t`  | AXI4+ATOP protection signal. Passed further in the miss pipeline.                                                                                                                                                                                                                                           |
-/// | `x_resp`    | `axi_pkg::resp_t`  | AXI4+ATOP response signal. This tells if we try to make un-allowed accesses onto address regions which are not mapped to either SPM nor cache. When this signal gets set somewhere in the pipeline, all following modules will pass the descriptor along and absorb the corresponding beats from the ports. |
-/// | `x_last`    | `logic`            | AXI4+ATOP last flag. Defines if the read or write unit send back the response.                                                                                                                                                                                                                              |
-/// | `spm`       | `logic`            | This field signals that the descriptor is of type SPM. It will not make a lookup in the hit/miss detection and utilize the hit bypass if applicable.                                                                                                                                                        |
-/// | `rw`        | `logic`            | This field determines if the descriptor makes a write access `1'b1` or read access `1'b0`.                                                                                                                                                                                                                  |
-/// | `way_ind`   | `logic`            | The way indicator. Is a vector of width equal of the set-associativity. Decodes the index of the cache set where the descriptor should make an access.                                                                                                                                                      |
-/// | `evict`     | `logic`            | The eviction flag. The descriptor missed and the line at the position was determined dirty by the detection. The evict unit will write back the dirty cache-line to the main memory.                                                                                                                        |
-/// | `evict_tag` | `logic`            | The eviction tag. As the field `a_x_addr` has the new tag in it, it is used to send back the right address to the main memory during eviction.                                                                                                                                                              |
-/// | `refill`    | `logic`            | The refill flag. The descriptor will trigger a read transaction to the main memory, refilling the cache-line.                                                                                                                                                                                               |
-/// | `flush`     | `logic`            | The flush flag. This only gets set when a way should be flushed. It gets only set by descriptors coming from the configuration module.                                                                                                                                                                      |
+/// | Name              | Type               | Function |
+/// |:----------------- |:------------------ |:----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+/// | `a_x_id`          | `axi_slv_id_t`     | The AXI4+ATOP ID of the burst entering through the slave port of the design. It has the same width as the slave port AXI ID.                                                                                                                                                                                |
+/// | `a_x_addr`        | `axi_addr_t`       | The address of the descriptor. Aligned to the corresponding cache block.                                                                                                                                                                                                                                    |
+/// | `a_x_len`         | `axi_pkg::len_t`   | AXI4+ATOP burst length field. Corresponds to the number of beats which map onto the cache line accessed by this descriptor. Gets set in the splitting unit which does the mapping onto the cache line.                                                                                                      |
+/// | `a_x_size`        | `axi_pkg::size_t`  | AXI4+ATOP size field. This is important for the write and read unit to find the exact block and byte offset. Used for calculating the block location in the data storage.                                                                                                                                   |
+/// | `a_x_burst`       | `axi_pkg::burst_t` | AXI4+ATOP burst type. This is important for the splitter unit as well as the read and write unit. It determines the descriptor field `a_x_addr`.                                                                                                                                                            |
+/// | `a_x_lock`        | `logic`            | AXI4+ATOP lock signal. Passed further in the miss pipeline when the line gets evicted or refilled.                                                                                                                                                                                                          |
+/// | `a_x_cache`       | `axi_pkg::cache_t` | AXI4+ATOP cache signal. The cache only supports write back mode.                                                                                                                                                                                                                                            |
+/// | `a_x_prot`        | `axi_pkg::prot_t`  | AXI4+ATOP protection signal. Passed further in the miss pipeline.                                                                                                                                                                                                                                           |
+/// | `x_resp`          | `axi_pkg::resp_t`  | AXI4+ATOP response signal. This tells if we try to make un-allowed accesses onto address regions which are not mapped to either SPM nor cache. When this signal gets set somewhere in the pipeline, all following modules will pass the descriptor along and absorb the corresponding beats from the ports. |
+/// | `x_last`          | `logic`            | AXI4+ATOP last flag. Defines if the read or write unit send back the response.                                                                                                                                                                                                                              |
+/// | `spm`             | `logic`            | This field signals that the descriptor is of type SPM. It will not make a lookup in the hit/miss detection and utilize the hit bypass if applicable.                                                                                                                                                        |
+/// | `rw`              | `logic`            | This field determines if the descriptor makes a write access `1'b1` or read access `1'b0`.                                                                                                                                                                                                                  |
+/// | `way_ind`         | `logic`            | The way indicator. Is a vector of width equal of the set-associativity. Decodes the index of the cache set where the descriptor should make an access.                                                                                                                                                      |
+/// | `evict`           | `logic`            | The eviction flag. The descriptor missed and the line at the position was determined dirty by the detection. The evict unit will write back the dirty cache-line to the main memory.                                                                                                                        |
+/// | `evict_tag`       | `logic`            | The eviction tag. As the field `a_x_addr` has the new tag in it, it is used to send back the right address to the main memory during eviction.                                                                                                                                                              |
+/// | `refill`          | `logic`            | The refill flag. The descriptor will trigger a read transaction to the main memory, refilling the cache-line.                                                                                                                                                                                               |
+/// | `flush`           | `logic`            | The flush flag. This only gets set when a way should be flushed. It gets only set by descriptors coming from the configuration module.                                                                                                                                                                      |
+/// | `patid`           | `logic`            | The partition ID. This indicates the current visited partition. It gets filled in burst cutter by reading from the AXI AW/AR user signals.                                                                                                                                                                  |
+/// | `index_partition` | `logic`            | The remapped index for cache partitioning. This will be calculated based on index bits from input address and partition's information.                                                                                                                                                                      |
+/// | `pat_size`        | `logic`            | This field is used when `TruncDual` remapping hash function is activated. It signals the size of the partition region which should be accessed, used for remapped index calculation when employing `TruncDual` hash function for index remapping                                                            |
+/// | `tcdl_overflow`   | `logic`            | This field is used when `TruncDual` remapping hash function is activated. It signals whether the remapped index from the first part (in `index_assigner` module) faces an overlapping situation                                                                                                             |
+/// | `max_tcdl_offset` | `logic`            | This field is used when `TruncDual` remapping hash function is activated. It signals the smallest (2^n-1) number that is larger than pat_size, e.g. If pat_size = 85, max_tcdl_offset_o = 127.                                                                                                              |
 module axi_llc_top #(
   /// The set-associativity of the LLC.
   ///
@@ -135,7 +142,7 @@ module axi_llc_top #(
   /// fields inside of a struct. Further this value has to be a power of 2. This has to do with the
   /// requirement that the address mapping from the address onto the cache-line index has to be
   /// continuous.
-  parameter int unsigned NumLines = 32'd0,
+  parameter int unsigned NumLines        = 32'd0,
   /// Number of blocks (words) in a cache line.
   ///
   /// The width of a block is the same as the data width of the AXI4+ATOP ports. Defined with
@@ -147,18 +154,39 @@ module axi_llc_top #(
   ///
   /// Note on restrictions:
   /// The same restriction as of parameter `NumLines` applies.
-  parameter int unsigned NumBlocks = 32'd0,
+  parameter int unsigned NumBlocks       = 32'd0,
+  /// Cache partitioning enabling parameter, bool type.
+  parameter logic        CachePartition  = 1,
+  /// Max. number of partitions supported for partitioning.
+  ///
+  /// Restrictions:
+  /// * Minimum value: 32'd2
+  ///
+  /// Note on restrictions:
+  /// The reason is the doubld-sided calculation for filling the partition table. The calculation needs
+  /// two partition: one on each side to correctly configure the partitions.
+  parameter int unsigned MaxPartition    = 32'd0,
+  /// Index remapping hash function used in cache partitioning
+  parameter axi_llc_pkg::algorithm_e RemapHash = axi_llc_pkg::Modulo,
   /// AXI4+ATOP ID field width of the slave port.
   /// The ID field width of the master port is this parameter + 1.
-  parameter int unsigned AxiIdWidth = 32'd0,
+  parameter int unsigned AxiIdWidth      = 32'd0,
   /// AXI4+ATOP address field width of both the slave and master port.
-  parameter int unsigned AxiAddrWidth = 32'd0,
+  parameter int unsigned AxiAddrWidth    = 32'd0,
   /// AXI4+ATOP data field width of both the slave and the master port.
-  parameter int unsigned AxiDataWidth = 32'd0,
+  parameter int unsigned AxiDataWidth    = 32'd0,
   /// AXI4+ATOP user field width of both the slave and the master port.
-  parameter int unsigned AxiUserWidth = 32'd0,
+  /// Here, "user" data part of AXI channel is used for signaling the
+  /// partition ID from which the data access is issued. AxiUserWidth 
+  /// should be equal to PIDWidth, which signals the partition ID. 
+  /// For current system, the upper bound of the number of partition
+  /// running is 256, so AxiUserWidth should be 8.
+  parameter int unsigned AxiUserWidth    = 32'd0, 
   /// Internal register width
-  parameter int unsigned RegWidth = 64,
+  parameter int unsigned RegWidth        = 64,
+  /// AXI4 User signal offset
+  parameter int unsigned AxiUserIdMsb    = 7,
+  parameter int unsigned AxiUserIdLsb    = 0,
   /// Register type for HW -> Register direction
   parameter type conf_regs_d_t  = logic,
   /// Register type for Register -> HW direction
@@ -187,7 +215,11 @@ module axi_llc_top #(
   parameter type axi_addr_t     = logic[AxiAddrWidth-1:0],
   /// Dependent parameter, do **not** overwrite!
   /// Data type of set associativity wide registers
-  parameter type way_ind_t      = logic[SetAssociativity-1:0]
+  parameter type way_ind_t      = logic[SetAssociativity-1:0],
+  /// Dependent parameter, do **not** overwrite!
+  /// Data type of set wide registers
+  parameter type set_ind_t      = logic[NumLines-1:0],
+  parameter type impl_in_t      = logic
 ) (
   /// Rising-edge clock of all ports.
   input logic clk_i,
@@ -195,6 +227,7 @@ module axi_llc_top #(
   input logic rst_ni,
   /// Test mode activate, active high.
   input logic test_i,
+  input impl_in_t [2*SetAssociativity-1:0] sram_impl_i,
   /// AXI4+ATOP slave port request, CPU side
   input slv_req_t slv_req_i,
   /// AXI4+ATOP slave port response, CPU side
@@ -253,8 +286,10 @@ module axi_llc_top #(
     NumLines          : NumLines,
     NumBlocks         : NumBlocks,
     BlockSize         : AxiCfg.DataWidthFull,
-    TagLength         : AxiCfg.AddrWidthFull - unsigned'($clog2(NumLines)) -
-        unsigned'($clog2(NumBlocks)) - unsigned'($clog2(AxiCfg.DataWidthFull / 32'd8)),
+    TagLength         : CachePartition ? (AxiCfg.AddrWidthFull - unsigned'($clog2(NumBlocks)) - 
+                                          unsigned'($clog2(AxiCfg.DataWidthFull / 32'd8))) : 
+                                          AxiCfg.AddrWidthFull - unsigned'($clog2(NumLines)) - 
+                                          unsigned'($clog2(NumBlocks)) - unsigned'($clog2(AxiCfg.DataWidthFull / 32'd8)),
     IndexLength       : unsigned'($clog2(NumLines)),
     BlockOffsetLength : unsigned'($clog2(NumBlocks)),
     ByteOffsetLength  : unsigned'($clog2(AxiCfg.DataWidthFull / 32'd8)),
@@ -263,16 +298,16 @@ module axi_llc_top #(
 
   typedef struct packed {
     // AXI4+ATOP specific descriptor signals
-    axi_slv_id_t                     a_x_id;   // AXI ID from slave port
-    axi_addr_t                       a_x_addr; // memory address
-    axi_pkg::len_t                   a_x_len;  // AXI burst length
-    axi_pkg::size_t                  a_x_size; // AXI burst size
-    axi_pkg::burst_t                 a_x_burst;// AXI burst type
-    logic                            a_x_lock; // AXI lock signal
-    axi_pkg::cache_t                 a_x_cache;// AXI cache signal
-    axi_pkg::prot_t                  a_x_prot; // AXI protection signal
-    axi_pkg::resp_t                  x_resp;   // AXI response signal, for error propagation
-    logic                            x_last;   // Last descriptor of a burst
+    axi_slv_id_t                     a_x_id;          // AXI ID from slave port
+    axi_addr_t                       a_x_addr;        // memory address
+    axi_pkg::len_t                   a_x_len;         // AXI burst length
+    axi_pkg::size_t                  a_x_size;        // AXI burst size
+    axi_pkg::burst_t                 a_x_burst;       // AXI burst type
+    logic                            a_x_lock;        // AXI lock signal
+    axi_pkg::cache_t                 a_x_cache;       // AXI cache signal
+    axi_pkg::prot_t                  a_x_prot;        // AXI protection signal
+    axi_pkg::resp_t                  x_resp;          // AXI response signal, for error propagation
+    logic                            x_last;          // Last descriptor of a burst
     // Cache specific descriptor signals
     logic                            spm;      // this descriptor targets a SPM region in the cache
     logic                            rw;       // this descriptor is a read:0 or write:1 access
@@ -281,6 +316,15 @@ module axi_llc_top #(
     logic [Cfg.TagLength -1:0]       evict_tag;// tag for evicting a line
     logic                            refill;   // refill the cache line
     logic                            flush;    // flush this line, comes from config
+    logic [AxiUserWidth-1:0]         patid;
+    logic [Cfg.IndexLength+1:0]      index_partition; // remapped index for cache partitioning
+    logic [Cfg.IndexLength+1:0]      pat_size;        // partition size, the width should be `Cfg.IndexLength+1`
+                                                      // because in index remapping calculation, we need to shift
+                                                      // this field left by 1 bit
+    logic                            tcdl_overflow;   // to tell whether the mapping index is overflowing,
+                                                      // only used in both-side index mapping hash function
+    logic [Cfg.IndexLength-1:0]      max_tcdl_offset; // the smallest (2^n-1) number that is larger than pat_size,
+                                                      // e.g. If pat_size = 85, max_tcdl_offset = 127.
   } llc_desc_t;
 
   // definition of the structs that are between the units and the ways
@@ -312,13 +356,26 @@ module axi_llc_top #(
     logic [Cfg.SetAssociativity-1:0] way_ind;       // way which is locked
   } lock_t;
 
+  typedef struct packed {
+    logic [Cfg.IndexLength:0] StartIndex; // Start index in the partition region assigned to the partition.
+    logic [Cfg.IndexLength:0] NumIndex;   // Number of indice of the partition.
+  } partition_table_t;
+
+  /// Partition table which tells the range of indice assigned to each partition:
+  /// The number of entry in partition_table is one more than MaxPartition because it needs to hold 
+  /// the remaining part as shared region for any other partition that has not been allocated.
+  /// If the entry is 0, then it means that the partition uses the shared region of cache. 
+  /// When we process data access of such partition, we should look up partition_table_o[MaxPartition]
+  /// for hit/miss information.
+  partition_table_t [MaxPartition:0] partition_table;
+
   // slave requests, that go into the bypass `axi_demux` from the config module
   // `index` for the axi_mux and axi_demux: bypass: 1, llc: 0
   logic slv_aw_bypass, slv_ar_bypass;
 
   // bypass channels and llc connection to the axi_demux and axi_mux
-  slv_req_t     to_demux_req,  bypass_req,   to_llc_req,   from_llc_req;
-  slv_resp_t    to_demux_resp, bypass_resp,  to_llc_resp,  from_llc_resp;
+  slv_req_t     to_isolate_req, to_demux_req,  bypass_req,   to_llc_req,   from_llc_req;
+  slv_resp_t    to_isolate_resp, to_demux_resp, bypass_resp,  to_llc_resp,  from_llc_resp;
 
   // signals between channel splitters and rw_arb_tree
   llc_desc_t [2:0]      ax_desc;
@@ -376,6 +433,7 @@ module axi_llc_top #(
   // global SPM lock signal
   logic [Cfg.SetAssociativity-1:0] spm_lock;
   logic [Cfg.SetAssociativity-1:0] flushed;
+  logic [Cfg.NumLines-1:0]         flushed_set;
 
   // BIST from tag_store
   logic [Cfg.SetAssociativity-1:0] bist_res;
@@ -383,6 +441,9 @@ module axi_llc_top #(
 
   // global flush signals
   logic llc_isolate, llc_isolated, aw_unit_busy, ar_unit_busy, flush_recv;
+
+  // clear control state
+  logic ctrl_clr;
 
   // define address rules from the address ports, propagate it throughout the design
   rule_full_t cached_addr_rule;
@@ -396,47 +457,115 @@ module axi_llc_top #(
     spm_addr_rule.end_addr      = spm_start_addr_i + axi_addr_t'(Cfg.SPMLength);
   end
 
-  // configuration, also has control over bypass logic and flush
-  axi_llc_config #(
-    .Cfg            ( Cfg           ),
-    .AxiCfg         ( AxiCfg        ),
-    .RegWidth       ( RegWidth      ),
-    .conf_regs_d_t  ( conf_regs_d_t ),
-    .conf_regs_q_t  ( conf_regs_q_t ),
-    .desc_t         ( llc_desc_t    ),
-    .rule_full_t    ( rule_full_t   ),
-    .set_asso_t     ( way_ind_t     ),
-    .addr_full_t    ( axi_addr_t    ),
-    .PrintLlcCfg    ( PrintLlcCfg   )
-  ) i_llc_config (
-    .clk_i             ( clk_i                                  ),
-    .rst_ni            ( rst_ni                                 ),
-    // Configuration registers
-    .conf_regs_i,
-    .conf_regs_o,
-    .spm_lock_o        ( spm_lock                               ),
-    .flushed_o         ( flushed                                ),
-    .desc_o            ( ax_desc[axi_llc_pkg::ConfigUnit]       ),
-    .desc_valid_o      ( ax_desc_valid[axi_llc_pkg::ConfigUnit] ),
-    .desc_ready_i      ( ax_desc_ready[axi_llc_pkg::ConfigUnit] ),
-    // AXI address input from slave port for controlling bypass
-    .slv_aw_addr_i     ( slv_req_i.aw.addr                      ),
-    .slv_ar_addr_i     ( slv_req_i.ar.addr                      ),
-    .mst_aw_bypass_o   ( slv_aw_bypass                          ),
-    .mst_ar_bypass_o   ( slv_ar_bypass                          ),
-    // flush control signals to prevent new data in ax_cutter loading
-    .llc_isolate_o     ( llc_isolate                            ),
-    .llc_isolated_i    ( llc_isolated                           ),
-    .aw_unit_busy_i    ( aw_unit_busy                           ),
-    .ar_unit_busy_i    ( ar_unit_busy                           ),
-    .flush_desc_recv_i ( flush_recv                             ),
-    // BIST input
-    .bist_res_i        ( bist_res                               ),
-    .bist_valid_i      ( bist_valid                             ),
-    // address rules for bypass selection
-    .axi_cached_rule_i ( cached_addr_rule                       ),
-    .axi_spm_rule_i    ( spm_addr_rule                          )
-  );
+  always_comb begin
+    to_isolate_req = slv_req_i;
+    slv_resp_o = to_isolate_resp;
+
+    to_isolate_req.aw.user = '0;
+    to_isolate_req.aw.user[AxiUserIdMsb-AxiUserIdLsb:0] = slv_req_i.aw.user[AxiUserIdMsb:AxiUserIdLsb];
+    to_isolate_req.ar.user = '0;
+    to_isolate_req.ar.user[AxiUserIdMsb-AxiUserIdLsb:0] = slv_req_i.ar.user[AxiUserIdMsb:AxiUserIdLsb];
+  end
+
+generate
+  if (CachePartition) begin
+    // configuration for LLC partitioning enabled, also has control over bypass logic and flush
+    axi_llc_config_pat #(
+      .Cfg               ( Cfg               ),
+      .AxiCfg            ( AxiCfg            ),
+      .RegWidth          ( RegWidth          ),
+      .MaxPartition      ( MaxPartition      ),
+      .conf_regs_d_t     ( conf_regs_d_t     ),
+      .conf_regs_q_t     ( conf_regs_q_t     ),
+      .desc_t            ( llc_desc_t        ),
+      .rule_full_t       ( rule_full_t       ),
+      .set_asso_t        ( way_ind_t         ),
+      .set_t             ( set_ind_t         ),
+      .addr_full_t       ( axi_addr_t        ),
+      .partition_id_t    ( axi_user_t        ),
+      .partition_table_t ( partition_table_t ),
+      .PrintLlcCfg       ( PrintLlcCfg       )
+    ) i_llc_config_pat (
+      .clk_i             ( clk_i                                  ),
+      .rst_ni            ( rst_ni                                 ),
+      // Configuration registers
+      .conf_regs_i,
+      .conf_regs_o,
+      .spm_lock_o        ( spm_lock                               ),
+      .flushed_o         ( flushed                                ),
+      .flushed_set_o     ( flushed_set                            ),
+      .desc_o            ( ax_desc[axi_llc_pkg::ConfigUnit]       ),
+      .desc_valid_o      ( ax_desc_valid[axi_llc_pkg::ConfigUnit] ),
+      .desc_ready_i      ( ax_desc_ready[axi_llc_pkg::ConfigUnit] ),
+      // AXI address input from slave port for controlling bypass
+      .slv_aw_addr_i     ( to_isolate_req.aw.addr                 ),
+      .slv_aw_partition_id_i ( to_isolate_req.aw.user             ),
+      .slv_ar_addr_i     ( to_isolate_req.ar.addr                 ),
+      .slv_ar_partition_id_i ( to_isolate_req.ar.user             ),
+      .mst_aw_bypass_o   ( slv_aw_bypass                          ),
+      .mst_ar_bypass_o   ( slv_ar_bypass                          ),
+      // flush control signals to prevent new data in ax_cutter loading
+      .llc_isolate_o     ( llc_isolate                            ),
+      .llc_isolated_i    ( llc_isolated                           ),
+      .aw_unit_busy_i    ( aw_unit_busy                           ),
+      .ar_unit_busy_i    ( ar_unit_busy                           ),
+      .flush_desc_recv_i ( flush_recv                             ),
+      // BIST input
+      .bist_res_i        ( bist_res                               ),
+      .bist_valid_i      ( bist_valid                             ),
+      // address rules for bypass selection
+      .axi_cached_rule_i ( cached_addr_rule                       ),
+      .axi_spm_rule_i    ( spm_addr_rule                          ),
+      // partition table
+      .partition_table_o ( partition_table                        ),
+      // Clear control state
+      .ctrl_clr_o        ( ctrl_clr                               )
+    );
+  end else begin
+    // configuration for LLC partitioning disabled, also has control over bypass logic and flush
+    axi_llc_config_no_pat #(
+      .Cfg            ( Cfg           ),
+      .AxiCfg         ( AxiCfg        ),
+      .RegWidth       ( RegWidth      ),
+      .conf_regs_d_t  ( conf_regs_d_t ),
+      .conf_regs_q_t  ( conf_regs_q_t ),
+      .desc_t         ( llc_desc_t    ),
+      .rule_full_t    ( rule_full_t   ),
+      .set_asso_t     ( way_ind_t     ),
+      .addr_full_t    ( axi_addr_t    ),
+      .PrintLlcCfg    ( PrintLlcCfg   )
+    ) i_llc_config_no_pat (
+      .clk_i             ( clk_i                                  ),
+      .rst_ni            ( rst_ni                                 ),
+      // Configuration registers
+      .conf_regs_i,
+      .conf_regs_o,
+      .spm_lock_o        ( spm_lock                               ),
+      .flushed_o         ( flushed                                ),
+      .desc_o            ( ax_desc[axi_llc_pkg::ConfigUnit]       ),
+      .desc_valid_o      ( ax_desc_valid[axi_llc_pkg::ConfigUnit] ),
+      .desc_ready_i      ( ax_desc_ready[axi_llc_pkg::ConfigUnit] ),
+      // AXI address input from slave port for controlling bypass
+      .slv_aw_addr_i     ( slv_req_i.aw.addr                      ),
+      .slv_ar_addr_i     ( slv_req_i.ar.addr                      ),
+      .mst_aw_bypass_o   ( slv_aw_bypass                          ),
+      .mst_ar_bypass_o   ( slv_ar_bypass                          ),
+      // flush control signals to prevent new data in ax_cutter loading
+      .llc_isolate_o     ( llc_isolate                            ),
+      .llc_isolated_i    ( llc_isolated                           ),
+      .aw_unit_busy_i    ( aw_unit_busy                           ),
+      .ar_unit_busy_i    ( ar_unit_busy                           ),
+      .flush_desc_recv_i ( flush_recv                             ),
+      // BIST input
+      .bist_res_i        ( bist_res                               ),
+      .bist_valid_i      ( bist_valid                             ),
+      // address rules for bypass selection
+      .axi_cached_rule_i ( cached_addr_rule                       ),
+      .axi_spm_rule_i    ( spm_addr_rule                          )
+    );
+  end
+endgenerate
+  
 
   // Isolation module before demux to easy flushing,
   // AXI requests get stalled while flush is active
@@ -451,8 +580,8 @@ module axi_llc_top #(
   ) i_axi_isolate_flush (
     .clk_i,
     .rst_ni,
-    .slv_req_i,  // Slave port request
-    .slv_resp_o, // Slave port response
+    .slv_req_i  ( to_isolate_req  ),  // Slave port request
+    .slv_resp_o ( to_isolate_resp ), // Slave port response
     .mst_req_o  ( to_demux_req  ),
     .mst_resp_i ( to_demux_resp ),
     .isolate_i  ( llc_isolate   ),
@@ -478,7 +607,7 @@ module axi_llc_top #(
     .SpillR         ( 1'b0                   )
   ) i_axi_bypass_demux (
     .clk_i           ( clk_i                    ),
-    .rst_ni          ( rst_ni                   ),
+    .rst_ni          ( rst_ni & ~ctrl_clr       ),
     .test_i          ( test_i                   ),
     .slv_req_i       ( to_demux_req             ),
     .slv_aw_select_i ( slv_aw_bypass            ),
@@ -492,13 +621,17 @@ module axi_llc_top #(
   axi_llc_chan_splitter #(
     .Cfg    ( Cfg           ),
     .AxiCfg ( AxiCfg        ),
+    .CachePartition ( CachePartition      ),
+    .MaxPartition   ( MaxPartition        ),
+    .RemapHash      ( RemapHash           ),
     .chan_t ( slv_aw_chan_t ),
     .Write  ( 1'b1          ),
     .desc_t ( llc_desc_t    ),
-    .rule_t ( rule_full_t   )
+    .rule_t ( rule_full_t   ),
+    .partition_table_t (partition_table_t)
   ) i_aw_splitter    (
     .clk_i           ( clk_i                                  ),
-    .rst_ni          ( rst_ni                                 ),
+    .rst_ni          ( rst_ni & ~ctrl_clr                     ),
     .ax_chan_slv_i   ( to_llc_req.aw                          ),
     .ax_chan_valid_i ( to_llc_req.aw_valid                    ),
     .ax_chan_ready_o ( to_llc_resp.aw_ready                   ),
@@ -507,21 +640,26 @@ module axi_llc_top #(
     .desc_ready_i    ( ax_desc_ready[axi_llc_pkg::AwChanUnit] ),
     .unit_busy_o     ( aw_unit_busy                           ),
     .cached_rule_i   ( cached_addr_rule                       ),
-    .spm_rule_i      ( spm_addr_rule                          )
+    .spm_rule_i      ( spm_addr_rule                          ),
+    .partition_table_i ( partition_table                      )
   );
 
 
   // RW channel burst splitter
   axi_llc_chan_splitter #(
-    .Cfg    ( Cfg           ),
-    .AxiCfg ( AxiCfg        ),
-    .chan_t ( slv_ar_chan_t ),
-    .Write  ( 1'b0          ),
-    .desc_t ( llc_desc_t    ),
-    .rule_t ( rule_full_t   )
+    .Cfg               ( Cfg               ),
+    .AxiCfg            ( AxiCfg            ),
+    .CachePartition    ( CachePartition    ),
+    .MaxPartition      ( MaxPartition      ),
+    .RemapHash         ( RemapHash         ),
+    .chan_t            ( slv_ar_chan_t     ),
+    .Write             ( 1'b0              ),
+    .desc_t            ( llc_desc_t        ),
+    .rule_t            ( rule_full_t       ),
+    .partition_table_t ( partition_table_t )
   ) i_ar_splitter    (
     .clk_i           ( clk_i                                  ),
-    .rst_ni          ( rst_ni                                 ),
+    .rst_ni          ( rst_ni  & ~ctrl_clr                                ),
     .ax_chan_slv_i   ( to_llc_req.ar                          ),
     .ax_chan_valid_i ( to_llc_req.ar_valid                    ),
     .ax_chan_ready_o ( to_llc_resp.ar_ready                   ),
@@ -530,7 +668,8 @@ module axi_llc_top #(
     .desc_ready_i    ( ax_desc_ready[axi_llc_pkg::ArChanUnit] ),
     .unit_busy_o     ( ar_unit_busy                           ),
     .cached_rule_i   ( cached_addr_rule                       ),
-    .spm_rule_i      ( spm_addr_rule                          )
+    .spm_rule_i      ( spm_addr_rule                          ),
+    .partition_table_i ( partition_table                      )
   );
 
   // arbitration tree which funnels the flush, read and write descriptors together
@@ -541,7 +680,7 @@ module axi_llc_top #(
     .LockIn   ( 1'b1       )
   ) i_rw_arb_tree (
     .clk_i  ( clk_i         ),
-    .rst_ni ( rst_ni        ),
+    .rst_ni ( rst_ni & ~ctrl_clr       ),
     .flush_i( '0            ),
     .rr_i   ( '0            ),
     .req_i  ( ax_desc_valid ),
@@ -557,7 +696,7 @@ module axi_llc_top #(
     .T       ( llc_desc_t )
   ) i_rw_spill (
     .clk_i   ( clk_i         ),
-    .rst_ni  ( rst_ni        ),
+    .rst_ni  ( rst_ni & ~ctrl_clr       ),
     .valid_i ( rw_desc_valid ),
     .ready_o ( rw_desc_ready ),
     .data_i  ( rw_desc       ),
@@ -567,17 +706,23 @@ module axi_llc_top #(
   );
 
   axi_llc_hit_miss #(
-    .Cfg          ( Cfg          ),
-    .AxiCfg       ( AxiCfg       ),
-    .desc_t       ( llc_desc_t   ),
-    .lock_t       ( lock_t       ),
-    .cnt_t        ( cnt_t        ),
-    .way_ind_t    ( way_ind_t    ),
-    .PrintSramCfg ( PrintSramCfg )
+    .Cfg               ( Cfg               ),
+    .AxiCfg            ( AxiCfg            ),
+    .CachePartition    ( CachePartition    ),
+    .RemapHash         ( RemapHash         ),
+    .desc_t            ( llc_desc_t        ),
+    .lock_t            ( lock_t            ),
+    .cnt_t             ( cnt_t             ),
+    .way_ind_t         ( way_ind_t         ),
+    .set_ind_t         ( set_ind_t         ),
+    .partition_table_t ( partition_table_t ),
+    .PrintSramCfg      ( PrintSramCfg      ),
+    .impl_in_t         ( impl_in_t         )
   ) i_hit_miss_unit (
     .clk_i,
     .rst_ni,
     .test_i,
+    .sram_impl_i    ( sram_impl_i[SetAssociativity-1:0] ),
     .desc_i         ( spill_desc   ),
     .valid_i        ( spill_valid  ),
     .ready_o        ( spill_ready  ),
@@ -588,6 +733,7 @@ module axi_llc_top #(
     .hit_ready_i    ( hit_ready    ),
     .spm_lock_i     ( spm_lock     ),
     .flushed_i      ( flushed      ),
+    .flushed_set_i  ( flushed_set  ),
     .w_unlock_i     ( w_unlock     ),
     .w_unlock_req_i ( w_unlock_req ),
     .w_unlock_gnt_o ( w_unlock_gnt ),
@@ -596,21 +742,23 @@ module axi_llc_top #(
     .r_unlock_gnt_o ( r_unlock_gnt ),
     .cnt_down_i     ( cnt_down     ),
     .bist_res_o     ( bist_res     ),
-    .bist_valid_o   ( bist_valid   )
+    .bist_valid_o   ( bist_valid   ),
+    .ctrl_clr_i     ( ctrl_clr     )
   );
 
   axi_llc_evict_unit #(
-    .Cfg       ( Cfg           ),
-    .AxiCfg    ( AxiCfg        ),
-    .desc_t    ( llc_desc_t    ),
-    .way_inp_t ( way_inp_t     ),
-    .way_oup_t ( way_oup_t     ),
-    .aw_chan_t ( slv_aw_chan_t ),
-    .w_chan_t  ( w_chan_t      ),
-    .b_chan_t  ( slv_b_chan_t  )
+    .Cfg            ( Cfg            ),
+    .AxiCfg         ( AxiCfg         ),
+    .CachePartition ( CachePartition ),
+    .desc_t         ( llc_desc_t     ),
+    .way_inp_t      ( way_inp_t      ),
+    .way_oup_t      ( way_oup_t      ),
+    .aw_chan_t      ( slv_aw_chan_t  ),
+    .w_chan_t       ( w_chan_t       ),
+    .b_chan_t       ( slv_b_chan_t   )
   ) i_evict_unit (
     .clk_i             ( clk_i                                ),
-    .rst_ni            ( rst_ni                               ),
+    .rst_ni            ( rst_ni & ~ctrl_clr                   ),
     .test_i            ( test_i                               ),
     .desc_i            ( desc                                 ),
     .desc_valid_i      ( miss_valid                           ),
@@ -638,15 +786,16 @@ module axi_llc_top #(
 
   // plug in refill unit for test
   axi_llc_refill_unit #(
-    .Cfg       ( Cfg           ),
-    .AxiCfg    ( AxiCfg        ),
-    .desc_t    ( llc_desc_t    ),
-    .way_inp_t ( way_inp_t     ),
-    .ar_chan_t ( slv_ar_chan_t ),
-    .r_chan_t  ( slv_r_chan_t  )
+    .Cfg            ( Cfg            ),
+    .AxiCfg         ( AxiCfg         ),
+    .CachePartition ( CachePartition ),
+    .desc_t         ( llc_desc_t     ),
+    .way_inp_t      ( way_inp_t      ),
+    .ar_chan_t      ( slv_ar_chan_t  ),
+    .r_chan_t       ( slv_r_chan_t   )
   ) i_refill_unit (
     .clk_i           ( clk_i                                ),
-    .rst_ni          ( rst_ni                               ),
+    .rst_ni          ( rst_ni & ~ctrl_clr                   ),
     .test_i          ( test_i                               ),
     .desc_i          ( evict_desc                           ),
     .desc_valid_i    ( evict_desc_valid                     ),
@@ -672,7 +821,7 @@ module axi_llc_top #(
     .cnt_t  ( cnt_t      )
   ) i_merge_unit (
     .clk_i,
-    .rst_ni,
+    .rst_ni ( rst_ni & ~ctrl_clr ),
     .bypass_desc_i ( desc              ),
     .bypass_valid_i( hit_valid         ),
     .bypass_ready_o( hit_ready         ),
@@ -690,16 +839,17 @@ module axi_llc_top #(
 
   // write unit
   axi_llc_write_unit #(
-    .Cfg       ( Cfg          ),
-    .AxiCfg    ( AxiCfg       ),
-    .desc_t    ( llc_desc_t   ),
-    .way_inp_t ( way_inp_t    ),
-    .lock_t    ( lock_t       ),
-    .w_chan_t  ( w_chan_t     ),
-    .b_chan_t  ( slv_b_chan_t )
+    .Cfg            ( Cfg            ),
+    .AxiCfg         ( AxiCfg         ),
+    .CachePartition ( CachePartition ),
+    .desc_t         ( llc_desc_t     ),
+    .way_inp_t      ( way_inp_t      ),
+    .lock_t         ( lock_t         ),
+    .w_chan_t       ( w_chan_t       ),
+    .b_chan_t       ( slv_b_chan_t   )
   ) i_write_unit  (
     .clk_i           ( clk_i                                ),
-    .rst_ni          ( rst_ni                               ),
+    .rst_ni          ( rst_ni & ~ctrl_clr                   ),
     .test_i          ( test_i                               ),
     .desc_i          ( write_desc                           ),
     .desc_valid_i    ( write_desc_valid                     ),
@@ -720,16 +870,17 @@ module axi_llc_top #(
 
   // read unit
   axi_llc_read_unit #(
-    .Cfg       ( Cfg          ),
-    .AxiCfg    ( AxiCfg       ),
-    .desc_t    ( llc_desc_t   ),
-    .way_inp_t ( way_inp_t    ),
-    .way_oup_t ( way_oup_t    ),
-    .lock_t    ( lock_t       ),
-    .r_chan_t  ( slv_r_chan_t )
+    .Cfg            ( Cfg            ),
+    .AxiCfg         ( AxiCfg         ),
+    .CachePartition ( CachePartition ),
+    .desc_t         ( llc_desc_t     ),
+    .way_inp_t      ( way_inp_t      ),
+    .way_oup_t      ( way_oup_t      ),
+    .lock_t         ( lock_t         ),
+    .r_chan_t       ( slv_r_chan_t   )
   ) i_read_unit (
     .clk_i           ( clk_i                                ),
-    .rst_ni          ( rst_ni                               ),
+    .rst_ni          ( rst_ni & ~ctrl_clr                   ),
     .test_i          ( test_i                               ),
     .desc_i          ( read_desc                            ),
     .desc_valid_i    ( read_desc_valid                      ),
@@ -753,11 +904,14 @@ module axi_llc_top #(
     .Cfg          ( Cfg          ),
     .way_inp_t    ( way_inp_t    ),
     .way_oup_t    ( way_oup_t    ),
-    .PrintSramCfg ( PrintSramCfg )
+    .PrintSramCfg ( PrintSramCfg ),
+    .impl_in_t    ( impl_in_t    )
   ) i_llc_ways (
     .clk_i                ( clk_i               ),
     .rst_ni               ( rst_ni              ),
     .test_i               ( test_i              ),
+    .ctrl_clr_i           ( ctrl_clr            ),
+    .sram_impl_i          ( sram_impl_i[2*SetAssociativity-1:SetAssociativity] ),
     .way_inp_i            ( to_way              ),
     .way_inp_valid_i      ( to_way_valid        ),
     .way_inp_ready_o      ( to_way_ready        ),
@@ -795,7 +949,7 @@ module axi_llc_top #(
     .SpillR        ( 1'b0                      )  // No registers
   ) i_axi_bypass_mux (
     .clk_i       ( clk_i                      ),
-    .rst_ni      ( rst_ni                     ),
+    .rst_ni      ( rst_ni & ~ctrl_clr                    ),
     .test_i      ( test_i                     ),
     .slv_reqs_i  ({bypass_req,  from_llc_req }),
     .slv_resps_o ({bypass_resp, from_llc_resp}),
@@ -1000,6 +1154,12 @@ module axi_llc_top #(
       $fatal(1, $sformatf("llc> AXI Master port, mst_ar_chan_t and mst_req_i.ar not equal"));
     mst_req_r    : assert ($bits(mst_r_chan_t) == $bits(mst_resp_i.r)) else
       $fatal(1, $sformatf("llc> AXI Slave port, slv_r_chan_t and mst_resp_i.r not equal"));
+
+    cfg_num_lines : assert(Cfg.NumLines > 0 && $onehot(Cfg.NumLines)) else
+      $fatal(1, "Parameter 'Cfg.NumLines' must be the integer power of 2 to ensure correct function for set based partition!");
+    max_partition : assert((MaxPartition != 1) && (MaxPartition <= Cfg.NumLines)) else
+      $fatal(1, "Parameter 'MaxPartition' must not be 1 or larger than number of cache lines to ensure correct function for set based partition!");
+
   end
 `endif
 // pragma translate_on

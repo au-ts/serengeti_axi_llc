@@ -32,7 +32,8 @@ module axi_llc_data_way #(
   /// } way_oup_t;
   parameter type way_oup_t = logic,
   /// Whether to print SRAM configs.
-  parameter bit  PrintSramCfg = 0
+  parameter bit  PrintSramCfg = 0,
+  parameter type impl_in_t = logic
 ) (
   /// Clock, positive edge triggered
   input logic clk_i,
@@ -40,6 +41,8 @@ module axi_llc_data_way #(
   input logic rst_ni,
   /// Testmode enable
   input logic test_i,
+  input logic ctrl_clr_i,
+  input impl_in_t sram_impl_i,
   /// Data way request input
   input way_inp_t inp_i,
   /// Request is valid
@@ -116,17 +119,20 @@ module axi_llc_data_way #(
     end
   end
 
-  tc_sram #(
+  // For functional test
+  axi_llc_sram_data #(
     .NumWords   ( Cfg.NumLines * Cfg.NumBlocks ),
     .DataWidth  ( Cfg.BlockSize                ),
     .ByteWidth  ( 32'd8                        ),
     .NumPorts   ( 32'd1                        ),
     .Latency    ( 32'd1                        ),
     .SimInit    ( "none"                       ),
-    .PrintSimCfg( PrintSramCfg                 )
+    .PrintSimCfg( PrintSramCfg                 ),
+    .impl_in_t  ( impl_in_t                    )
   ) i_data_sram (
     .clk_i,
     .rst_ni,
+    .impl_i  ( sram_impl_i ),
     .req_i   ( ram_req    ),
     .we_i    ( inp_i.we   ),
     .addr_i  ( addr       ),
@@ -135,9 +141,31 @@ module axi_llc_data_way #(
     .rdata_o ( out_o.data )
   );
 
+  // // For synthesis
+  // axi_llc_sram_data_fpga #(
+  //   .NumWords   ( Cfg.NumLines * Cfg.NumBlocks ),
+  //   .DataWidth  ( Cfg.BlockSize                ),
+  //   .ByteWidth  ( 32'd8                        ),
+  //   .NumPorts   ( 32'd1                        ),
+  //   .Latency    ( 32'd1                        ),
+  //   .SimInit    ( "none"                       ),
+  //   .PrintSimCfg( 1'b1                         ),
+  //   .NumLines   ( Cfg.NumLines                 ),
+  //   .PrintSimCfg( PrintSramCfg                 )
+  // ) i_data_sram (
+  //   .clk_i,
+  //   .rst_ni,
+  //   .req_i   ( ram_req    ),
+  //   .we_i    ( inp_i.we   ),
+  //   .addr_i  ( addr       ),
+  //   .wdata_i ( inp_i.data ),
+  //   .be_i    ( inp_i.strb ),
+  //   .rdata_o ( out_o.data )
+  // );
+
   // Flip Flops to hold the read request meta information
-  `FFLARN(outp_valid_q, outp_valid_d, load_valid, '0, clk_i, rst_ni)
-  `FFLARN(cache_unit_q, cache_unit_d, load_unit, axi_llc_pkg::EvictUnit, clk_i, rst_ni)
+  `FFLARNC(outp_valid_q, outp_valid_d, load_valid, ctrl_clr_i, '0, clk_i, rst_ni)
+  `FFLARNC(cache_unit_q, cache_unit_d, load_unit, ctrl_clr_i, axi_llc_pkg::EvictUnit, clk_i, rst_ni)
 
 // pragma translate_off
 `ifndef VERILATOR
